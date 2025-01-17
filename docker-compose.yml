@@ -1,0 +1,68 @@
+services:
+  spark-master:
+    build:
+      context: ./spark
+    container_name: spark-master
+    hostname: spark-master
+    ports:
+      - "4040:4040"
+      - "8080:8080"
+      - "7077:7077"
+      - "6066:6066"
+    networks:
+      spark-network:
+        aliases:
+          - spark-master
+    volumes:
+      - shared-data:/shared-data
+      - ./logs/spark-master:/opt/spark/logs
+    environment:
+      - SPARK_MODE=master
+      - PYSPARK_PYTHON=python3
+    command: bin/spark-class org.apache.spark.deploy.master.Master
+
+  spark-worker:
+    build:
+      context: ./spark
+    container_name: spark-worker
+    hostname: spark-worker
+    depends_on:
+      - spark-master
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      - PYSPARK_PYTHON=python3
+    command: bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
+    ports:
+      - "8081:8081"
+    networks:
+      spark-network:
+        aliases:
+          - spark-worker
+    volumes:
+      - shared-data:/shared-data
+      - ./logs/spark-worker:/opt/spark/logs
+  
+  client:
+    build:
+      context: ./client
+    container_name: client
+    hostname: client
+    ports:
+      - "3000:3000"
+    networks:
+      spark-network:
+        aliases:
+          - client
+    volumes:
+      - shared-data:/shared-data
+      - ./scripts:/scripts
+    depends_on:
+      - spark-master
+
+networks:
+  spark-network:
+    driver: bridge
+
+volumes:
+  shared-data:
